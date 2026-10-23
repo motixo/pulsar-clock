@@ -30,6 +30,8 @@ DEFAULTS = {
     "bold_text": "true",
     "date_time_separator": 'Some(" • ")',
     "text_color": "None",
+    "text_color_dark": "None",
+    "text_color_light": "None",
 }
 
 
@@ -109,7 +111,8 @@ def install(binary, activate=True):
         target = settings / key
         if not target.exists():
             original = stock / key
-            value = original.read_text() if key not in {"bold_text", "date_time_separator", "text_color"} and original.exists() else default
+            custom = {"bold_text", "date_time_separator", "text_color", "text_color_dark", "text_color_light"}
+            value = original.read_text() if key not in custom and original.exists() else default
             atomic_write(target, value)
     if BINARY.exists():
         STATE.mkdir(parents=True, exist_ok=True)

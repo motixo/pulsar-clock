@@ -13,10 +13,10 @@ index 0967be8..d3ba3ba 100644
  cosmic-applets-config.workspace = true
  jiff = "0.2"
 diff --git a/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl b/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
-index 12d559d..8755c35 100644
+index 12d559d..8fe824d 100644
 --- a/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
 +++ b/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
-@@ -1 +1,13 @@
+@@ -1 +1,14 @@
 -datetime-settings = Date, Time and Calendar Settings...
 \ No newline at end of file
 +datetime-settings = Date, Time and Calendar Settings...
@@ -29,8 +29,9 @@ index 12d559d..8755c35 100644
 +clock-separator = Separator (including spaces)
 +clock-back = Back to calendar
 +clock-reset-format = Use normal date/time formatting
-+clock-custom-color = Custom text color
-+clock-color-hex = HEX color
++clock-custom-color = Custom text colors
++clock-color-dark-hex = Dark theme HEX color
++clock-color-light-hex = Light theme HEX color
 +clock-color-invalid = Enter 3 or 6 HEX digits. The last valid color stays applied.
 diff --git a/cosmic-applet-time/src/lib.rs b/cosmic-applet-time/src/lib.rs
 index 668189e..ed794d8 100644
@@ -71,7 +72,7 @@ index 7fbb932..1e08951 100644
      let _ = tracing_log::LogTracer::init();
  
 diff --git a/cosmic-applet-time/src/window.rs b/cosmic-applet-time/src/window.rs
-index a96b447..7636869 100644
+index a96b447..bafe751 100644
 --- a/cosmic-applet-time/src/window.rs
 +++ b/cosmic-applet-time/src/window.rs
 @@ -18,7 +18,7 @@ use cosmic::{
@@ -83,7 +84,7 @@ index a96b447..7636869 100644
      },
  };
  use jiff::{
-@@ -33,14 +33,21 @@ use std::sync::LazyLock;
+@@ -33,14 +33,22 @@ use std::sync::LazyLock;
  use timedate_zbus::TimeDateProxy;
  use tokio::{sync::watch, time};
  
@@ -92,7 +93,8 @@ index a96b447..7636869 100644
 +    config::TimeAppletConfig,
 +    fl,
 +    presentation::{
-+        DEFAULT_TEXT_COLOR, create_datetime, format_panel_datetime, panel_color, parse_hex_color,
++        DEFAULT_DARK_TEXT_COLOR, DEFAULT_LIGHT_TEXT_COLOR, color_input, create_datetime,
++        format_panel_datetime, panel_color, parse_hex_color,
 +    },
 +    time::get_calendar_first,
 +};
@@ -108,16 +110,17 @@ index a96b447..7636869 100644
          options::TimePrecision,
      },
      locale::{Locale, preferences::extensions::unicode::keywords::HourCycle},
-@@ -89,6 +96,8 @@ pub struct Window {
+@@ -89,6 +97,9 @@ pub struct Window {
      rectangle: Rectangle,
      token_tx: Option<calloop::channel::Sender<TokenRequest>>,
      config: TimeAppletConfig,
 +    show_preferences: bool,
-+    color_input: String,
++    color_input_dark: String,
++    color_input_light: String,
      show_seconds_tx: watch::Sender<bool>,
      locale: Locale,
  }
-@@ -105,27 +114,117 @@ pub enum Message {
+@@ -105,29 +116,130 @@ pub enum Message {
      OpenDateTimeSettings,
      Token(TokenUpdate),
      ConfigChanged(TimeAppletConfig),
@@ -128,7 +131,8 @@ index a96b447..7636869 100644
 +    SetCustomSeparator(bool),
 +    SetSeparator(String),
 +    SetCustomColor(bool),
-+    SetColor(String),
++    SetDarkColor(String),
++    SetLightColor(String),
 +    ResetCustomFormat,
      TimezoneUpdate(String),
      Surface(surface::Action<Message>),
@@ -162,7 +166,7 @@ index a96b447..7636869 100644
 +    }
 +
 +    fn panel_text_style(&self) -> theme::Text {
-+        panel_color(&self.config)
++        panel_color(&self.config, theme::is_dark())
 +            .map(theme::Text::Color)
 +            .unwrap_or_default()
 +    }
@@ -178,9 +182,9 @@ index a96b447..7636869 100644
 +                }
 +            }
 +            Err(err) => tracing::error!(?err, "Could not open clock preferences"),
-+        }
-+    }
-+
+         }
+     }
+ 
 +    fn preferences_view(&self) -> Element<'_, Message> {
 +        let mut controls = column![
 +            text::body(fl!("clock-preferences")).font(cosmic::font::bold()),
@@ -215,7 +219,7 @@ index a96b447..7636869 100644
 +                ]
 +                .spacing(8),
 +            );
-         }
++        }
 +        controls = controls.push(
 +            toggler(self.config.text_color.is_some())
 +                .label(fl!("clock-custom-color"))
@@ -225,11 +229,21 @@ index a96b447..7636869 100644
 +        );
 +        if self.config.text_color.is_some() {
 +            let mut color_controls = column![
-+                text::body(fl!("clock-color-hex")),
-+                text_input(DEFAULT_TEXT_COLOR, &self.color_input).on_input(Message::SetColor),
++                text::body(fl!("clock-color-dark-hex")),
++                text_input(DEFAULT_DARK_TEXT_COLOR, &self.color_input_dark)
++                    .on_input(Message::SetDarkColor),
 +            ]
 +            .spacing(8);
-+            if parse_hex_color(&self.color_input).is_none() {
++            if parse_hex_color(&self.color_input_dark).is_none() {
++                color_controls = color_controls.push(text::caption(fl!("clock-color-invalid")));
++            }
++            color_controls = color_controls
++                .push(text::body(fl!("clock-color-light-hex")))
++                .push(
++                    text_input(DEFAULT_LIGHT_TEXT_COLOR, &self.color_input_light)
++                        .on_input(Message::SetLightColor),
++                );
++            if parse_hex_color(&self.color_input_light).is_none() {
 +                color_controls = color_controls.push(text::caption(fl!("clock-color-invalid")));
 +            }
 +            controls = controls.push(color_controls);
@@ -246,10 +260,12 @@ index a96b447..7636869 100644
 +        ]
 +        .padding([16, 0]);
 +        self.core.applet.popup_container(container(content)).into()
-     }
- 
++    }
++
      fn calendar_grid(&self) -> Grid<'_, Message> {
-@@ -193,7 +292,14 @@ impl Window {
+         let mut calendar = grid().width(Length::Fill);
+         let first_day_of_week = match self.config.first_day_of_week {
+@@ -193,7 +305,14 @@ impl Window {
          let elements: Vec<Element<'_, Message>> = if let Some(strftime) = self.maybe_strftime() {
              strftime
                  .split_whitespace()
@@ -265,7 +281,7 @@ index a96b447..7636869 100644
                  .collect()
          } else {
              let mut elements = Vec::new();
-@@ -213,7 +319,14 @@ impl Window {
+@@ -213,7 +332,14 @@ impl Window {
                      .to_string();
  
                  for p in formatted_date.split_whitespace() {
@@ -281,7 +297,7 @@ index a96b447..7636869 100644
                  }
                  elements.push(
                      rule::horizontal(2)
-@@ -233,7 +346,14 @@ impl Window {
+@@ -233,7 +359,14 @@ impl Window {
              // todo: split using formatToParts when it is implemented
              // https://github.com/unicode-org/icu4x/issues/4936#issuecomment-2128812667
              for p in formatted_time.split_whitespace().flat_map(|s| s.split(':')) {
@@ -297,7 +313,7 @@ index a96b447..7636869 100644
              }
  
              elements
-@@ -257,52 +377,15 @@ impl Window {
+@@ -257,52 +390,15 @@ impl Window {
      }
  
      fn horizontal_layout(&self) -> Element<'_, Message> {
@@ -356,7 +372,7 @@ index a96b447..7636869 100644
                  container(space::vertical().height(Length::Fixed(
                      (self.core.applet.suggested_size(true).1
                          + 2 * self.core.applet.suggested_padding(true).1)
-@@ -318,7 +401,11 @@ impl cosmic::Application for Window {
+@@ -318,7 +414,11 @@ impl cosmic::Application for Window {
      type Message = Message;
      type Executor = cosmic::SingleThreadExecutor;
      type Flags = ();
@@ -369,7 +385,7 @@ index a96b447..7636869 100644
  
      fn init(core: app::Core, _flags: Self::Flags) -> (Self, app::Task<Self::Message>) {
          let locale = get_system_locale();
-@@ -327,7 +414,14 @@ impl cosmic::Application for Window {
+@@ -327,7 +427,12 @@ impl cosmic::Application for Window {
          let today = now.date();
  
          // Synch `show_seconds` from the config within the time subscription
@@ -378,25 +394,24 @@ index a96b447..7636869 100644
 +            .map(|helper| TimeAppletConfig::get_entry(&helper).unwrap_or_else(|(_, config)| config))
 +            .unwrap_or_default();
 +        let (show_seconds_tx, _) = watch::channel(config.show_seconds);
-+        let color_input = config
-+            .text_color
-+            .clone()
-+            .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
++        let color_input_dark = color_input(&config, true);
++        let color_input_light = color_input(&config, false);
  
          (
              Self {
-@@ -340,7 +434,9 @@ impl cosmic::Application for Window {
+@@ -340,7 +445,10 @@ impl cosmic::Application for Window {
                  rectangle_tracker: None,
                  rectangle: Rectangle::default(),
                  token_tx: None,
 -                config: TimeAppletConfig::default(),
 +                config,
 +                show_preferences: false,
-+                color_input,
++                color_input_dark,
++                color_input_light,
                  show_seconds_tx,
                  locale,
              },
-@@ -520,6 +616,7 @@ impl cosmic::Application for Window {
+@@ -520,6 +628,7 @@ impl cosmic::Application for Window {
                  if let Some(p) = self.popup.take() {
                      destroy_popup(p)
                  } else {
@@ -404,18 +419,15 @@ index a96b447..7636869 100644
                      return cosmic::surface::surface_task(cosmic::surface::action::app_popup(
                          |_| Default::default(),
                          |app: &mut Self| {
-@@ -636,7 +733,73 @@ impl cosmic::Application for Window {
+@@ -636,7 +745,103 @@ impl cosmic::Application for Window {
                  }
                  Task::none()
              }
 +            Message::TogglePreferences => {
 +                self.show_preferences = !self.show_preferences;
 +                if self.show_preferences {
-+                    self.color_input = self
-+                        .config
-+                        .text_color
-+                        .clone()
-+                        .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
++                    self.color_input_dark = color_input(&self.config, true);
++                    self.color_input_light = color_input(&self.config, false);
 +                }
 +                Task::none()
 +            }
@@ -446,18 +458,47 @@ index a96b447..7636869 100644
 +                Task::none()
 +            }
 +            Message::SetCustomColor(enabled) => {
-+                if enabled && parse_hex_color(&self.color_input).is_none() {
-+                    self.color_input = DEFAULT_TEXT_COLOR.into();
++                if enabled {
++                    if parse_hex_color(&self.color_input_dark).is_none() {
++                        let saved = color_input(&self.config, true);
++                        self.color_input_dark = if parse_hex_color(&saved).is_some() {
++                            saved
++                        } else {
++                            DEFAULT_DARK_TEXT_COLOR.into()
++                        };
++                    }
++                    if parse_hex_color(&self.color_input_light).is_none() {
++                        let saved = color_input(&self.config, false);
++                        self.color_input_light = if parse_hex_color(&saved).is_some() {
++                            saved
++                        } else {
++                            DEFAULT_LIGHT_TEXT_COLOR.into()
++                        };
++                    }
++                    self.config.text_color_dark = Some(self.color_input_dark.clone());
++                    self.config.text_color_light = Some(self.color_input_light.clone());
 +                }
-+                self.config.text_color = enabled.then(|| self.color_input.clone());
++                self.config.text_color = enabled.then(|| self.color_input_dark.clone());
 +                self.save_config();
 +                Task::none()
 +            }
-+            Message::SetColor(value) => {
-+                self.color_input = value;
++            Message::SetDarkColor(value) => {
++                self.color_input_dark = value;
 +                // Keep the last valid color while an incomplete or invalid code is edited.
-+                if parse_hex_color(&self.color_input).is_some() {
-+                    self.config.text_color = Some(self.color_input.clone());
++                if self.config.text_color.is_some()
++                    && parse_hex_color(&self.color_input_dark).is_some()
++                {
++                    self.config.text_color_dark = Some(self.color_input_dark.clone());
++                    self.save_config();
++                }
++                Task::none()
++            }
++            Message::SetLightColor(value) => {
++                self.color_input_light = value;
++                if self.config.text_color.is_some()
++                    && parse_hex_color(&self.color_input_light).is_some()
++                {
++                    self.config.text_color_light = Some(self.color_input_light.clone());
 +                    self.save_config();
 +                }
 +                Task::none()
@@ -469,16 +510,20 @@ index a96b447..7636869 100644
 +                Task::none()
 +            }
              Message::ConfigChanged(c) => {
-+                if self.config.text_color != c.text_color {
-+                    self.color_input = c
-+                        .text_color
-+                        .clone()
-+                        .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
++                if self.config.text_color_dark != c.text_color_dark
++                    || self.config.text_color != c.text_color
++                {
++                    self.color_input_dark = color_input(&c, true);
++                }
++                if self.config.text_color_light != c.text_color_light
++                    || self.config.text_color != c.text_color
++                {
++                    self.color_input_light = color_input(&c, false);
 +                }
                  // Don't interrupt the tick subscription unless necessary
                  self.show_seconds_tx.send_if_modified(|show_seconds| {
                      if !c.format_strftime.is_empty() {
-@@ -709,6 +872,10 @@ impl cosmic::Application for Window {
+@@ -709,6 +914,10 @@ impl cosmic::Application for Window {
      }
  
      fn view_window(&self, _id: window::Id) -> Element<'_, Message> {
@@ -489,7 +534,7 @@ index a96b447..7636869 100644
          let Spacing {
              space_xxs, space_s, ..
          } = theme::active().cosmic().spacing;
-@@ -752,6 +919,7 @@ impl cosmic::Application for Window {
+@@ -752,6 +961,7 @@ impl cosmic::Application for Window {
              .padding([12, 20]),
              calendar.padding([0, 12].into()),
              padded_control(divider::horizontal::default()).padding([space_xxs, space_s]),
@@ -498,10 +543,10 @@ index a96b447..7636869 100644
                  .on_press(Message::OpenDateTimeSettings),
          ]
 diff --git a/cosmic-applets-config/src/time.rs b/cosmic-applets-config/src/time.rs
-index 8af3902..b05ef17 100644
+index 8af3902..237c10a 100644
 --- a/cosmic-applets-config/src/time.rs
 +++ b/cosmic-applets-config/src/time.rs
-@@ -11,6 +11,12 @@ pub struct TimeAppletConfig {
+@@ -11,6 +11,16 @@ pub struct TimeAppletConfig {
      pub first_day_of_week: u8,
      pub show_date_in_top_panel: bool,
      pub show_weekday: bool,
@@ -511,25 +556,31 @@ index 8af3902..b05ef17 100644
 +    pub date_time_separator: Option<String>,
 +    #[serde(default)]
 +    pub text_color: Option<String>,
++    #[serde(default)]
++    pub text_color_dark: Option<String>,
++    #[serde(default)]
++    pub text_color_light: Option<String>,
      #[serde(default, skip_serializing_if = "str::is_empty")]
      pub format_strftime: String,
  }
-@@ -23,6 +29,9 @@ impl Default for TimeAppletConfig {
+@@ -23,6 +33,11 @@ impl Default for TimeAppletConfig {
              first_day_of_week: 6,
              show_date_in_top_panel: true,
              show_weekday: false,
 +            bold_text: false,
 +            date_time_separator: Some(" • ".into()),
 +            text_color: None,
++            text_color_dark: None,
++            text_color_light: None,
              format_strftime: Default::default(),
          }
      }
 diff --git a/cosmic-applet-time/src/presentation.rs b/cosmic-applet-time/src/presentation.rs
 new file mode 100644
-index 0000000..d893a22
+index 0000000..92893eb
 --- /dev/null
 +++ b/cosmic-applet-time/src/presentation.rs
-@@ -0,0 +1,289 @@
+@@ -0,0 +1,396 @@
 +// SPDX-License-Identifier: GPL-3.0-only
 +
 +use crate::config::TimeAppletConfig;
@@ -543,7 +594,8 @@ index 0000000..d893a22
 +};
 +use jiff::{Zoned, civil::Date, fmt::strtime};
 +
-+pub const DEFAULT_TEXT_COLOR: &str = "#FF9500";
++pub const DEFAULT_DARK_TEXT_COLOR: &str = "#FFFFFF";
++pub const DEFAULT_LIGHT_TEXT_COLOR: &str = "#000000";
 +
 +pub fn parse_hex_color(value: &str) -> Option<cosmic::iced::Color> {
 +    let value = value.trim();
@@ -555,8 +607,28 @@ index 0000000..d893a22
 +    hex.parse().ok()
 +}
 +
-+pub fn panel_color(config: &TimeAppletConfig) -> Option<cosmic::iced::Color> {
-+    config.text_color.as_deref().and_then(parse_hex_color)
++pub fn color_input(config: &TimeAppletConfig, is_dark: bool) -> String {
++    let (color, default) = if is_dark {
++        (&config.text_color_dark, DEFAULT_DARK_TEXT_COLOR)
++    } else {
++        (&config.text_color_light, DEFAULT_LIGHT_TEXT_COLOR)
++    };
++    color
++        .as_ref()
++        .or(config.text_color.as_ref())
++        .map_or_else(|| default.into(), Clone::clone)
++}
++
++pub fn panel_color(config: &TimeAppletConfig, is_dark: bool) -> Option<cosmic::iced::Color> {
++    // Retain the original field as the enable switch and the fallback for
++    // preferences saved before separate light/dark colors were introduced.
++    let legacy = config.text_color.as_deref()?;
++    let color = if is_dark {
++        &config.text_color_dark
++    } else {
++        &config.text_color_light
++    };
++    parse_hex_color(color.as_deref().unwrap_or(legacy))
 +}
 +
 +pub fn create_datetime(date: &Date, now: &Zoned) -> DateTime<icu::calendar::Gregorian> {
@@ -685,13 +757,99 @@ index 0000000..d893a22
 +    #[test]
 +    fn missing_or_invalid_color_uses_the_theme() {
 +        let mut config = TimeAppletConfig::default();
-+        assert_eq!(panel_color(&config), None);
++        assert_eq!(panel_color(&config, true), None);
 +        config.text_color = Some("#00FF00".into());
-+        assert_eq!(panel_color(&config).unwrap().into_rgba8(), [0, 255, 0, 255]);
++        assert_eq!(
++            panel_color(&config, true).unwrap().into_rgba8(),
++            [0, 255, 0, 255]
++        );
 +        config.text_color = Some("invalid".into());
-+        assert_eq!(panel_color(&config), None);
++        assert_eq!(panel_color(&config, true), None);
 +        config.text_color = None;
-+        assert_eq!(panel_color(&config), None);
++        assert_eq!(panel_color(&config, true), None);
++    }
++
++    #[test]
++    fn theme_changes_select_independent_colors_without_changing_preferences() {
++        let config = TimeAppletConfig {
++            text_color: Some("#FF9500".into()),
++            text_color_dark: Some("#aef".into()),
++            text_color_light: Some("#153047".into()),
++            ..Default::default()
++        };
++        let saved = config.clone();
++        for is_dark in [true, false, true, false] {
++            let expected = if is_dark {
++                [170, 238, 255, 255]
++            } else {
++                [21, 48, 71, 255]
++            };
++            assert_eq!(
++                panel_color(&config, is_dark).unwrap().into_rgba8(),
++                expected
++            );
++        }
++        assert_eq!(config, saved);
++    }
++
++    #[test]
++    fn legacy_color_applies_to_both_themes_until_each_is_customized() {
++        let mut config = TimeAppletConfig {
++            text_color: Some("#0f0".into()),
++            ..Default::default()
++        };
++        for is_dark in [false, true] {
++            assert_eq!(color_input(&config, is_dark), "#0f0");
++            assert_eq!(
++                panel_color(&config, is_dark).unwrap().into_rgba8(),
++                [0, 255, 0, 255]
++            );
++        }
++        config.text_color_dark = Some("#fff".into());
++        assert_eq!(panel_color(&config, true), Some(cosmic::iced::Color::WHITE));
++        assert_eq!(
++            panel_color(&config, false).unwrap().into_rgba8(),
++            [0, 255, 0, 255]
++        );
++    }
++
++    #[test]
++    fn disabling_custom_colors_keeps_both_choices_for_reenabling() {
++        let mut config = TimeAppletConfig {
++            text_color: None,
++            text_color_dark: Some("#aef".into()),
++            text_color_light: Some("#123".into()),
++            ..Default::default()
++        };
++        for is_dark in [true, false] {
++            assert_eq!(panel_color(&config, is_dark), None);
++        }
++        assert_eq!(color_input(&config, true), "#aef");
++        assert_eq!(color_input(&config, false), "#123");
++        config.text_color = Some(color_input(&config, true));
++        assert_eq!(
++            panel_color(&config, true).unwrap().into_rgba8(),
++            [170, 238, 255, 255]
++        );
++        assert_eq!(
++            panel_color(&config, false).unwrap().into_rgba8(),
++            [17, 34, 51, 255]
++        );
++    }
++
++    #[test]
++    fn defaults_and_invalid_external_values_are_isolated_by_theme() {
++        let mut config = TimeAppletConfig::default();
++        assert_eq!(color_input(&config, true), "#FFFFFF");
++        assert_eq!(color_input(&config, false), "#000000");
++        config.text_color = Some("#fff".into());
++        config.text_color_dark = Some("invalid".into());
++        config.text_color_light = Some("#123".into());
++        assert_eq!(panel_color(&config, true), None);
++        assert_eq!(
++            panel_color(&config, false).unwrap().into_rgba8(),
++            [17, 34, 51, 255]
++        );
 +    }
 +
 +    fn example() -> (TimeAppletConfig, Zoned, Locale) {

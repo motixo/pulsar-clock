@@ -12,10 +12,12 @@ A separate per-user applet keeps your customization across system package update
 - Show or hide seconds.
 - Switch between 12-hour and 24-hour time.
 - Choose a date/time separator. The default is ` • `, with a space on each side.
-- Set the text color with a 3-digit or 6-digit HEX code, with or without `#`.
+- Set separate dark and light theme text colors with 3-digit or 6-digit HEX codes, with or without `#`.
 - Apply and save preferences immediately from the clock's own menu.
 
-Turning off **Custom text color** restores the theme color. Incomplete or invalid HEX input keeps the last valid color applied. The separator applies to horizontal panels; vertical panels keep their stacked layout and support bold text and custom colors.
+Enable **Custom text colors**, then set **Dark theme HEX color** and **Light theme HEX color** independently. The clock switches colors automatically with its panel's active theme. New custom colors default to white in dark mode and black in light mode; an existing single color remains the starting color for both modes until you change it.
+
+Turning off **Custom text colors** restores the theme color and keeps both saved choices for re-enabling. Incomplete or invalid HEX input keeps the last valid color for that mode applied. The separator applies to horizontal panels; vertical panels keep their stacked layout and support bold text and custom colors.
 
 ## Easy install: ready-made binary
 

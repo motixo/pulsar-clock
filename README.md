@@ -1,4 +1,4 @@
-# COSMIC Clock
+# Pulsar Clock
 
 Extra clock preferences for the COSMIC desktop: bold text, seconds, 12/24-hour time, a custom date/time separator, and HEX text colors.
 
@@ -21,24 +21,18 @@ Turning off **Custom text color** restores the theme color. Incomplete or invali
 
 The prebuilt release targets **Linux x86_64**, **glibc 2.35 or newer**, and **COSMIC 1.9.0**. Python 3.9+ and the runtime libraries used by COSMIC are needed. Rust, Cargo, and a C compiler are optional.
 
-Download the archive from [Releases](https://github.com/motixo/cosmic-clock/releases/latest), or run:
+Download the archive from [Releases](https://github.com/motixo/pulsar-clock/releases/latest), or run:
 
 ```sh
-curl -fLO https://github.com/motixo/cosmic-clock/releases/latest/download/cosmic-clock-linux-x86_64.tar.gz
-tar -xzf cosmic-clock-linux-x86_64.tar.gz
-cd cosmic-clock
+curl -fLO https://github.com/motixo/pulsar-clock/releases/latest/download/pulsar-clock-linux-x86_64.tar.gz
+tar -xzf pulsar-clock-linux-x86_64.tar.gz
+cd pulsar-clock
 ./install.sh
 ```
 
 The archive contains the compiled clock, installer, and uninstaller. Installation verifies the binary checksum and checks that the executable can run before changing the installed clock. Run it as your normal desktop user, without `sudo`.
 
-If you already have a Git checkout, the same command downloads and verifies the matching release automatically:
-
-```sh
-./install.sh
-```
-
-Click the panel clock, then **Clock preferences…**. If your panel did not already contain a clock, add **Custom Clock** through the panel's applet settings.
+Click the panel clock, then **Clock preferences…**. If your panel did not already contain a clock, add **Pulsar Clock** through the panel's applet settings.
 
 The first installation copies your existing stock clock preferences and uses the bullet separator by default. Later installations preserve your custom preferences. Use `./install.sh --no-activate` to install without changing the current panel applets.
 
@@ -57,8 +51,8 @@ sudo pacman -S --needed git rust base-devel python
 Then build and install:
 
 ```sh
-git clone https://github.com/motixo/cosmic-clock.git
-cd cosmic-clock
+git clone https://github.com/motixo/pulsar-clock.git
+cd pulsar-clock
 ./install.sh --from-source
 ```
 
@@ -112,19 +106,19 @@ This restores the stock clock in the panel and removes the custom executable and
 ./uninstall.sh --purge
 ```
 
-Panel backups are retained under `~/.local/state/cosmic-clock-custom/backups/`. When the panel is not running, the restored selection is used on the next login.
+Panel backups are retained under `~/.local/state/pulsar-clock/backups/`. When the panel is not running, the restored selection is used on the next login.
 
-To switch back temporarily while keeping the custom applet installed, run `python3 scripts/clock-control.py restore`. Use `python3 scripts/clock-control.py activate` to switch back to Custom Clock, or `python3 scripts/clock-control.py status` to inspect the current selection and process.
+To switch back temporarily while keeping the custom applet installed, run `python3 scripts/clock-control.py restore`. Use `python3 scripts/clock-control.py activate` to switch back to Pulsar Clock, or `python3 scripts/clock-control.py status` to inspect the current selection and process.
 
 ## Installed files
 
 | Purpose | Default location |
 | --- | --- |
-| Executable | `~/.local/bin/cosmic-clock-custom` |
-| Desktop entry | `~/.local/share/applications/io.github.motixo.CosmicClock.desktop` |
-| Preferences | `~/.config/cosmic/io.github.motixo.CosmicClock/v1/` |
-| Source and build cache | `~/.cache/cosmic-clock-custom/` |
-| Panel backups | `~/.local/state/cosmic-clock-custom/backups/` |
+| Executable | `~/.local/bin/pulsar-clock` |
+| Desktop entry | `~/.local/share/applications/io.github.motixo.PulsarClock.desktop` |
+| Preferences | `~/.config/cosmic/io.github.motixo.PulsarClock/v1/` |
+| Source and build cache | `~/.cache/pulsar-clock/` |
+| Panel backups | `~/.local/state/pulsar-clock/backups/` |
 
 Configuration, data, cache, and state paths respect their corresponding XDG environment variables. System package files stay unchanged.
 

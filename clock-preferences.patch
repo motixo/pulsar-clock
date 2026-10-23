@@ -32,26 +32,6 @@ index 12d559d..8755c35 100644
 +clock-custom-color = Custom text color
 +clock-color-hex = HEX color
 +clock-color-invalid = Enter 3 or 6 HEX digits. The last valid color stays applied.
-diff --git a/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl b/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
-index ee46b87..2f96626 100644
---- a/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
-+++ b/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
-@@ -1 +1,13 @@
--datetime-settings = تنظیمات تاریخ، زمان و تقویم...
-\ No newline at end of file
-+datetime-settings = تنظیمات تاریخ، زمان و تقویم...
-+
-+clock-preferences = تنظیمات ساعت…
-+clock-bold = نمایش ساعت با فونت ضخیم
-+clock-seconds = نمایش ثانیه
-+clock-24-hour = قالب ۲۴ ساعته
-+clock-custom-separator = جداکنندهٔ دلخواه تاریخ و ساعت
-+clock-separator = جداکننده (همراه با فاصله‌ها)
-+clock-back = بازگشت به تقویم
-+clock-reset-format = استفاده از قالب معمول تاریخ و ساعت
-+clock-custom-color = رنگ دلخواه متن
-+clock-color-hex = رنگ HEX
-+clock-color-invalid = کد HEX سه یا شش رقمی وارد کن. آخرین رنگ معتبر حفظ می‌شود.
 diff --git a/cosmic-applet-time/src/lib.rs b/cosmic-applet-time/src/lib.rs
 index 668189e..ed794d8 100644
 --- a/cosmic-applet-time/src/lib.rs
@@ -65,7 +45,7 @@ index 668189e..ed794d8 100644
  mod window;
  
 diff --git a/cosmic-applet-time/src/main.rs b/cosmic-applet-time/src/main.rs
-index 7fbb932..063ec7f 100644
+index 7fbb932..1e08951 100644
 --- a/cosmic-applet-time/src/main.rs
 +++ b/cosmic-applet-time/src/main.rs
 @@ -4,6 +4,21 @@
@@ -74,14 +54,14 @@ index 7fbb932..063ec7f 100644
  fn main() -> cosmic::iced::Result {
 +    #[cfg(feature = "personal-clock")]
 +    {
-+        let version = option_env!("COSMIC_CLOCK_VERSION").unwrap_or("development");
++        let version = option_env!("PULSAR_CLOCK_VERSION").unwrap_or("development");
 +        if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
-+            println!("COSMIC Clock {version} (COSMIC {VERSION})");
++            println!("Pulsar Clock {version} (COSMIC {VERSION})");
 +            return Ok(());
 +        }
 +        if std::env::args().any(|arg| arg == "--help" || arg == "-h") {
 +            println!(
-+                "COSMIC Clock {version}\n\nA COSMIC panel applet. Use install.sh, then add Custom Clock to your panel.\n\nOptions:\n  -V, --version  Print version\n  -h, --help     Print help"
++                "Pulsar Clock {version}\n\nA COSMIC panel applet. Use install.sh, then add Pulsar Clock to your panel.\n\nOptions:\n  -V, --version  Print version\n  -h, --help     Print help"
 +            );
 +            return Ok(());
 +        }
@@ -91,7 +71,7 @@ index 7fbb932..063ec7f 100644
      let _ = tracing_log::LogTracer::init();
  
 diff --git a/cosmic-applet-time/src/window.rs b/cosmic-applet-time/src/window.rs
-index a96b447..29eb02c 100644
+index a96b447..7636869 100644
 --- a/cosmic-applet-time/src/window.rs
 +++ b/cosmic-applet-time/src/window.rs
 @@ -18,7 +18,7 @@ use cosmic::{
@@ -382,7 +362,7 @@ index a96b447..29eb02c 100644
      type Flags = ();
 -    const APP_ID: &str = "com.system76.CosmicAppletTime";
 +    const APP_ID: &str = if cfg!(feature = "personal-clock") {
-+        "io.github.motixo.CosmicClock"
++        "io.github.motixo.PulsarClock"
 +    } else {
 +        "com.system76.CosmicAppletTime"
 +    };

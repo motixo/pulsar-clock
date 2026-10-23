@@ -40,7 +40,7 @@ if [[ -z $release_ref ]]; then
     fi
 fi
 
-cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}/cosmic-clock-custom
+cache_dir=${XDG_CACHE_HOME:-"$HOME/.cache"}/pulsar-clock
 mkdir -p -- "$cache_dir"
 source_dir=$(mktemp -d "$cache_dir/source.XXXXXXXX")
 printf 'Building from upstream %s in %s\n' "$release_ref" "$source_dir"
@@ -54,8 +54,8 @@ fi
 git apply "$script_dir/clock-preferences.patch"
 export CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-"$cache_dir/target"}
 export CARGO_BUILD_JOBS=${CARGO_BUILD_JOBS:-6}
-export COSMIC_CLOCK_VERSION
-COSMIC_CLOCK_VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$script_dir/release.json")
+export PULSAR_CLOCK_VERSION
+PULSAR_CLOCK_VERSION=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$script_dir/release.json")
 cargo test -p cosmic-applet-time --features personal-clock --locked --lib
 cargo build -p cosmic-applet-time --features personal-clock --locked --release --bin cosmic-applet-time
 executable="$CARGO_TARGET_DIR/release/cosmic-applet-time"

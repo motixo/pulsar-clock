@@ -23,8 +23,8 @@ class ClockControlTests(unittest.TestCase):
         clock.CONFIG = root / "config"
         clock.STATE = root / "state"
         clock.DATA = root / "data"
-        clock.CACHE = root / "cache/cosmic-clock-custom"
-        clock.BINARY = root / "bin/cosmic-clock-custom"
+        clock.CACHE = root / "cache/pulsar-clock"
+        clock.BINARY = root / "bin/pulsar-clock"
         clock.DESKTOP = clock.DATA / "applications" / f"{clock.APP_ID}.desktop"
         clock.atomic_write(clock.CONFIG / "com.system76.CosmicPanel/v1/entries", '[\n "Panel",\n]')
         self.center = clock.CONFIG / "com.system76.CosmicPanel.Panel/v1/plugins_center"

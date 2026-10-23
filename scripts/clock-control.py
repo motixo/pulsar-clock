@@ -12,13 +12,13 @@ import tempfile
 import time
 from datetime import datetime, timezone
 
-APP_ID = "io.github.motixo.CosmicClock"
+APP_ID = "io.github.motixo.PulsarClock"
 STOCK_ID = "com.system76.CosmicAppletTime"
 CONFIG = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "cosmic"
 DATA = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
-STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "cosmic-clock-custom"
-CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "cosmic-clock-custom"
-BINARY = Path.home() / ".local/bin/cosmic-clock-custom"
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "pulsar-clock"
+CACHE = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache") / "pulsar-clock"
+BINARY = Path.home() / ".local/bin/pulsar-clock"
 DESKTOP = DATA / "applications" / f"{APP_ID}.desktop"
 DEFAULTS = {
     "show_seconds": "false",
@@ -83,8 +83,7 @@ def desktop_text():
     # Escape the absolute executable path according to the Desktop Entry Exec rules.
     escaped = str(BINARY).replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$").replace("%", "%%")
     return f'''[Desktop Entry]
-Name=Custom Clock
-Name[fa]=ساعت سفارشی
+Name=Pulsar Clock
 Comment=Date, time and calendar with clock preferences
 Type=Application
 Exec="{escaped}"
@@ -127,7 +126,7 @@ def install(binary, activate=True):
     if selected:
         print("Click the clock, then Clock preferences…")
     else:
-        print("Add Custom Clock through COSMIC panel settings when you want to use it.")
+        print("Add Pulsar Clock through COSMIC panel settings when you want to use it.")
     if selected and not activated:
         # COSMIC can remove an applet after a clean exit instead of respawning it.
         # Keep the running instance alive; the new executable is used on the next login.
@@ -151,7 +150,7 @@ def uninstall(purge=False):
         for directory in (CONFIG / APP_ID, CACHE):
             if directory.exists():
                 shutil.rmtree(directory)
-    print("Custom Clock removed; the stock clock is selected wherever it was replaced.")
+    print("Pulsar Clock removed; the stock clock is selected wherever it was replaced.")
     print("Panel backups are retained in " + str(STATE / "backups"))
     if not purge:
         print("Custom preferences and build cache are retained. Use --purge to remove them too.")

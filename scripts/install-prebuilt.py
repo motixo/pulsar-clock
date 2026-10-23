@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install a verified COSMIC Clock release without a Rust toolchain."""
+"""Install a verified Pulsar Clock release without a Rust toolchain."""
 
 import argparse
 import hashlib
@@ -15,12 +15,12 @@ import tarfile
 import tempfile
 import urllib.request
 
-ASSET = "cosmic-clock-linux-x86_64.tar.gz"
-PREFIX = "cosmic-clock"
+ASSET = "pulsar-clock-linux-x86_64.tar.gz"
+PREFIX = "pulsar-clock"
 
 
 def download(url, destination):
-    request = urllib.request.Request(url, headers={"User-Agent": "cosmic-clock-installer"})
+    request = urllib.request.Request(url, headers={"User-Agent": "pulsar-clock-installer"})
     with urllib.request.urlopen(request, timeout=60) as response, destination.open("wb") as output:
         shutil.copyfileobj(response, output)
 
@@ -50,8 +50,8 @@ def unpack_binary(archive_path, destination):
     # Read only these two regular files; never extract paths supplied by a tarball.
     with tarfile.open(archive_path, "r:gz") as archive:
         bundle = json.loads(read_member(archive, f"{PREFIX}/bundle.json", 16384))
-        content = read_member(archive, f"{PREFIX}/bin/cosmic-clock-custom", 128 * 1024 * 1024)
-    binary = destination / "cosmic-clock-custom"
+        content = read_member(archive, f"{PREFIX}/bin/pulsar-clock", 128 * 1024 * 1024)
+    binary = destination / "pulsar-clock"
     binary.write_bytes(content)
     binary.chmod(0o755)
     return binary, bundle
@@ -88,7 +88,7 @@ def check_platform(release):
 
 def check_runtime(binary, release):
     result = subprocess.run([str(binary), "--version"], text=True, capture_output=True)
-    expected = f"COSMIC Clock {release['version']} (COSMIC {release['upstream_ref'].removeprefix('epoch-')})"
+    expected = f"Pulsar Clock {release['version']} (COSMIC {release['upstream_ref'].removeprefix('epoch-')})"
     if result.returncode or result.stdout.strip() != expected:
         detail = result.stderr.strip() or result.stdout.strip() or f"exit status {result.returncode}"
         raise RuntimeError(f"The downloaded clock cannot run on this system: {detail}")
@@ -98,7 +98,7 @@ def fetch_binary(release, destination):
     base_url = f"https://github.com/{release['repository']}/releases/download/v{release['version']}"
     checksum_path = destination / "SHA256SUMS"
     archive_path = destination / ASSET
-    print(f"Downloading COSMIC Clock {release['version']} for Linux x86_64…", flush=True)
+    print(f"Downloading Pulsar Clock {release['version']} for Linux x86_64…", flush=True)
     download(f"{base_url}/SHA256SUMS", checksum_path)
     download(f"{base_url}/{ASSET}", archive_path)
     verify_checksum(archive_path, checksum_path.read_text())
@@ -116,8 +116,8 @@ def install_release(root, no_activate=False):
     release = json.loads((root / "release.json").read_text())
     check_platform(release)
     manager = load_manager(root)
-    with tempfile.TemporaryDirectory(prefix="cosmic-clock-install-") as temporary:
-        local_binary = root / "bin/cosmic-clock-custom"
+    with tempfile.TemporaryDirectory(prefix="pulsar-clock-install-") as temporary:
+        local_binary = root / "bin/pulsar-clock"
         if local_binary.is_file():
             binary = local_binary
             bundle = json.loads((root / "bundle.json").read_text())

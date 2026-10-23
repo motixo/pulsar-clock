@@ -20,4 +20,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version=$(python3 -c 'import json; print(json.load(open("release.json"))["version"])')
-          gh release create "v$version" "$RUNNER_TEMP/release/"* --target "$GITHUB_SHA" --title "COSMIC Clock v$version" --notes-file RELEASE_NOTES.md
+          gh release create "v$version" "$RUNNER_TEMP/release/"* --target "$GITHUB_SHA" --title "Pulsar Clock v$version" --notes-file RELEASE_NOTES.md

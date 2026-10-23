@@ -13,10 +13,10 @@ git clone --depth 1 --single-branch --branch "$upstream_ref" https://github.com/
 git -C "$work/source" apply --check "$root/clock-preferences.patch"
 git -C "$work/source" apply "$root/clock-preferences.patch"
 mkdir -p "$work/cargo" "$work/target"
-docker build -t cosmic-clock-release-builder -f "$root/packaging/Dockerfile" "$root/packaging"
+docker build -t pulsar-clock-release-builder -f "$root/packaging/Dockerfile" "$root/packaging"
 docker run --rm --user "$(id -u):$(id -g)" \
-    -e COSMIC_CLOCK_VERSION="$version" -e CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" \
+    -e PULSAR_CLOCK_VERSION="$version" -e CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-2}" \
     -v "$work/source:/source:ro" -v "$work/cargo:/build/cargo" -v "$work/target:/build/target" \
-    cosmic-clock-release-builder sh -c \
+    pulsar-clock-release-builder sh -c \
     'cargo test -p cosmic-applet-time --features personal-clock --locked --lib && cargo build -p cosmic-applet-time --features personal-clock --locked --release --bin cosmic-applet-time && strip --strip-unneeded /build/target/release/cosmic-applet-time && /build/target/release/cosmic-applet-time --version'
 python3 "$root/scripts/package-release.py" --binary "$work/target/release/cosmic-applet-time" --source "$work/source" --output "$output_dir"

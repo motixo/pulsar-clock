@@ -31,14 +31,14 @@ def main():
         "README.md", "LICENSE", "NOTICE", "clock-preferences.patch", "assets/screenshot.png",
         "scripts/clock-control.py", "scripts/install-prebuilt.py",
     ]
-    binary_archive = args.output / "cosmic-clock-linux-x86_64.tar.gz"
+    binary_archive = args.output / "pulsar-clock-linux-x86_64.tar.gz"
     with tarfile.open(binary_archive, "w:gz") as archive:
         for name in files:
-            add_bytes(archive, f"cosmic-clock/{name}", (root / name).read_bytes(), name.endswith(".sh"))
-        add_bytes(archive, "cosmic-clock/bin/cosmic-clock-custom", args.binary.read_bytes(), True)
-        add_bytes(archive, "cosmic-clock/bundle.json", json.dumps(bundle, indent=2).encode() + b"\n")
-    source_archive = args.output / f"cosmic-clock-v{release['version']}-source.tar.gz"
-    prefix = f"cosmic-clock-v{release['version']}-source"
+            add_bytes(archive, f"pulsar-clock/{name}", (root / name).read_bytes(), name.endswith(".sh"))
+        add_bytes(archive, "pulsar-clock/bin/pulsar-clock", args.binary.read_bytes(), True)
+        add_bytes(archive, "pulsar-clock/bundle.json", json.dumps(bundle, indent=2).encode() + b"\n")
+    source_archive = args.output / f"pulsar-clock-v{release['version']}-source.tar.gz"
+    prefix = f"pulsar-clock-v{release['version']}-source"
     with tarfile.open(source_archive, "w:gz") as archive:
         for path in sorted(args.source.rglob("*")):
             relative = path.relative_to(args.source)

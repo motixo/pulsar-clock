@@ -23,7 +23,7 @@ class PrebuiltTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.release = json.loads((root / "release.json").read_text())
-        self.binary = self.root / "bin/cosmic-clock-custom"
+        self.binary = self.root / "bin/pulsar-clock"
         self.binary.parent.mkdir()
         self.binary.write_bytes(b"\x7fELFtest-binary")
         self.bundle = {**self.release, "binary_sha256": hashlib.sha256(self.binary.read_bytes()).hexdigest()}
@@ -34,13 +34,13 @@ class PrebuiltTests(unittest.TestCase):
         path = self.root / prebuilt.ASSET
         with tarfile.open(path, "w:gz") as archive:
             for name, content in [
-                ("cosmic-clock/bundle.json", json.dumps(self.bundle).encode()),
-                ("cosmic-clock/bin/cosmic-clock-custom", self.binary.read_bytes()),
+                ("pulsar-clock/bundle.json", json.dumps(self.bundle).encode()),
+                ("pulsar-clock/bin/pulsar-clock", self.binary.read_bytes()),
                 ("../../unwanted", b"do not extract"),
             ]:
                 info = tarfile.TarInfo(name)
                 info.size = len(content)
-                if symlink and name.endswith("cosmic-clock-custom"):
+                if symlink and name.endswith("pulsar-clock"):
                     info.type = tarfile.SYMTYPE
                     info.linkname = "/etc/passwd"
                 archive.addfile(info, io.BytesIO(content))
@@ -89,7 +89,7 @@ class PrebuiltTests(unittest.TestCase):
                 prebuilt.check_platform(self.release)
 
     def test_runtime_is_checked_before_install(self):
-        expected = f"COSMIC Clock {self.release['version']} (COSMIC {self.release['upstream_ref'].removeprefix('epoch-')})\n"
+        expected = f"Pulsar Clock {self.release['version']} (COSMIC {self.release['upstream_ref'].removeprefix('epoch-')})\n"
         with patch.object(prebuilt.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, expected, "")):
             prebuilt.check_runtime(self.binary, self.release)
         with patch.object(prebuilt.subprocess, "run", return_value=subprocess.CompletedProcess([], 127, "", "library missing")):

@@ -21,7 +21,7 @@ Turning off **Custom text colors** restores the theme color and keeps both saved
 
 ## Easy install: ready-made binary
 
-The prebuilt release targets **Linux x86_64**, **glibc 2.35 or newer**, and **COSMIC 1.9.0**. Python 3.9+ and the runtime libraries used by COSMIC are needed. Rust, Cargo, and a C compiler are optional.
+The prebuilt release supports **Linux x86_64**, **glibc 2.35 or newer**, and **COSMIC 1.9.0, 1.10.0 and 1.11.0**. Python 3.9+ and the runtime libraries used by COSMIC are needed. Rust, Cargo, and a C compiler are optional.
 
 Download the archive from [Releases](https://github.com/motixo/pulsar-clock/releases/latest), or run:
 
@@ -42,7 +42,7 @@ The first installation copies your existing stock clock preferences and uses the
 
 ## Build it yourself
 
-The patch is based on upstream [`epoch-1.9.0`](https://github.com/pop-os/cosmic-applets/tree/epoch-1.9.0) and has been tested on Arch Linux with `cosmic-applets` 1.9.0. The prebuilt binary uses an Ubuntu 22.04 build environment.
+The published v0.2.0 binary is built from [`epoch-1.9.0`](https://github.com/pop-os/cosmic-applets/tree/epoch-1.9.0) in Ubuntu 22.04. The same binary has also been run on COSMIC 1.10.0 and an isolated COSMIC 1.11.0 compositor. The patch applies to all three releases; its 15 clock tests also pass when rebuilt against 1.11.0. Dark/light colors, seconds, 12/24-hour time and a custom separator were exercised in the isolated desktop.
 
 On Arch, install the build tools:
 

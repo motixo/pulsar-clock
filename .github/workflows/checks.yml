@@ -10,6 +10,9 @@ permissions:
 
 jobs:
   scripts-and-patch:
+    strategy:
+      matrix:
+        cosmic: ["1.9.0", "1.10.0", "1.11.0"]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,5 +30,5 @@ jobs:
           python3 -m unittest discover -s tests -v
       - name: Check patch against the supported upstream release
         run: |
-          git clone --depth 1 --single-branch --branch epoch-1.9.0 https://github.com/pop-os/cosmic-applets.git "$RUNNER_TEMP/cosmic-applets"
+          git clone --depth 1 --single-branch --branch "epoch-${{ matrix.cosmic }}" https://github.com/pop-os/cosmic-applets.git "$RUNNER_TEMP/cosmic-applets"
           git -C "$RUNNER_TEMP/cosmic-applets" apply --check "$GITHUB_WORKSPACE/clock-preferences.patch"

@@ -1,6 +1,7 @@
 {
   "version": "0.2.0",
   "upstream_ref": "epoch-1.9.0",
+  "tested_cosmic_versions": ["1.9.0", "1.10.0", "1.11.0"],
   "repository": "motixo/pulsar-clock",
   "architecture": "x86_64",
   "minimum_glibc": "2.35"

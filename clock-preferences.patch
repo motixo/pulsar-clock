@@ -1,0 +1,802 @@
+diff --git a/cosmic-applet-time/Cargo.toml b/cosmic-applet-time/Cargo.toml
+index 0967be8..d3ba3ba 100644
+--- a/cosmic-applet-time/Cargo.toml
++++ b/cosmic-applet-time/Cargo.toml
+@@ -4,6 +4,9 @@ version = "1.9.0"
+ edition = "2024"
+ license = "GPL-3.0-only"
+ 
++[features]
++personal-clock = []
++
+ [dependencies]
+ cosmic-applets-config.workspace = true
+ jiff = "0.2"
+diff --git a/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl b/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
+index 12d559d..8755c35 100644
+--- a/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
++++ b/cosmic-applet-time/i18n/en/cosmic_applet_time.ftl
+@@ -1 +1,13 @@
+-datetime-settings = Date, Time and Calendar Settings...
+\ No newline at end of file
++datetime-settings = Date, Time and Calendar Settings...
++
++clock-preferences = Clock preferences…
++clock-bold = Bold clock text
++clock-seconds = Show seconds
++clock-24-hour = 24-hour time
++clock-custom-separator = Custom date/time separator
++clock-separator = Separator (including spaces)
++clock-back = Back to calendar
++clock-reset-format = Use normal date/time formatting
++clock-custom-color = Custom text color
++clock-color-hex = HEX color
++clock-color-invalid = Enter 3 or 6 HEX digits. The last valid color stays applied.
+diff --git a/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl b/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
+index ee46b87..2f96626 100644
+--- a/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
++++ b/cosmic-applet-time/i18n/fa/cosmic_applet_time.ftl
+@@ -1 +1,13 @@
+-datetime-settings = تنظیمات تاریخ، زمان و تقویم...
+\ No newline at end of file
++datetime-settings = تنظیمات تاریخ، زمان و تقویم...
++
++clock-preferences = تنظیمات ساعت…
++clock-bold = نمایش ساعت با فونت ضخیم
++clock-seconds = نمایش ثانیه
++clock-24-hour = قالب ۲۴ ساعته
++clock-custom-separator = جداکنندهٔ دلخواه تاریخ و ساعت
++clock-separator = جداکننده (همراه با فاصله‌ها)
++clock-back = بازگشت به تقویم
++clock-reset-format = استفاده از قالب معمول تاریخ و ساعت
++clock-custom-color = رنگ دلخواه متن
++clock-color-hex = رنگ HEX
++clock-color-invalid = کد HEX سه یا شش رقمی وارد کن. آخرین رنگ معتبر حفظ می‌شود.
+diff --git a/cosmic-applet-time/src/lib.rs b/cosmic-applet-time/src/lib.rs
+index 668189e..ed794d8 100644
+--- a/cosmic-applet-time/src/lib.rs
++++ b/cosmic-applet-time/src/lib.rs
+@@ -4,6 +4,7 @@
+ pub use cosmic_applets_config::time as config;
+ 
+ mod localize;
++mod presentation;
+ mod time;
+ mod window;
+ 
+diff --git a/cosmic-applet-time/src/window.rs b/cosmic-applet-time/src/window.rs
+index a96b447..3d10f06 100644
+--- a/cosmic-applet-time/src/window.rs
++++ b/cosmic-applet-time/src/window.rs
+@@ -18,7 +18,7 @@ use cosmic::{
+     surface, theme,
+     widget::{
+         Button, Grid, Id, autosize, button, container, divider, grid, icon, rectangle_tracker::*,
+-        space, text,
++        space, text, text_input, toggler,
+     },
+ };
+ use jiff::{
+@@ -33,14 +33,21 @@ use std::sync::LazyLock;
+ use timedate_zbus::TimeDateProxy;
+ use tokio::{sync::watch, time};
+ 
+-use crate::{config::TimeAppletConfig, fl, time::get_calendar_first};
++use crate::{
++    config::TimeAppletConfig,
++    fl,
++    presentation::{
++        DEFAULT_TEXT_COLOR, create_datetime, format_panel_datetime, panel_color, parse_hex_color,
++    },
++    time::get_calendar_first,
++};
+ use cosmic::applet::token::subscription::{
+     TokenRequest, TokenUpdate, activation_token_subscription,
+ };
++use cosmic::cosmic_config::{Config, CosmicConfigEntry};
+ use icu::{
+     datetime::{
+-        DateTimeFormatter, DateTimeFormatterPreferences, fieldsets,
+-        input::{Date as IcuDate, DateTime, Time},
++        DateTimeFormatter, DateTimeFormatterPreferences, fieldsets, input::DateTime,
+         options::TimePrecision,
+     },
+     locale::{Locale, preferences::extensions::unicode::keywords::HourCycle},
+@@ -89,6 +96,8 @@ pub struct Window {
+     rectangle: Rectangle,
+     token_tx: Option<calloop::channel::Sender<TokenRequest>>,
+     config: TimeAppletConfig,
++    show_preferences: bool,
++    color_input: String,
+     show_seconds_tx: watch::Sender<bool>,
+     locale: Locale,
+ }
+@@ -105,27 +114,117 @@ pub enum Message {
+     OpenDateTimeSettings,
+     Token(TokenUpdate),
+     ConfigChanged(TimeAppletConfig),
++    TogglePreferences,
++    SetBold(bool),
++    SetShowSeconds(bool),
++    SetMilitaryTime(bool),
++    SetCustomSeparator(bool),
++    SetSeparator(String),
++    SetCustomColor(bool),
++    SetColor(String),
++    ResetCustomFormat,
+     TimezoneUpdate(String),
+     Surface(surface::Action<Message>),
+ }
+ 
+ impl Window {
+     fn create_datetime(&self, date: &Date) -> DateTime<icu::calendar::Gregorian> {
+-        DateTime {
+-            date: IcuDate::try_new_gregorian(
+-                date.year() as i32,
+-                date.month() as u8,
+-                date.day() as u8,
+-            )
+-            .unwrap(),
+-            time: Time::try_new(
+-                self.now.hour() as u8,
+-                self.now.minute() as u8,
+-                self.now.second() as u8,
+-                0,
+-            )
+-            .unwrap(),
++        create_datetime(date, &self.now)
++    }
++
++    fn panel_font(&self) -> cosmic::iced::Font {
++        if self.config.bold_text {
++            cosmic::font::bold()
++        } else {
++            cosmic::font::default()
++        }
++    }
++
++    fn panel_text_style(&self) -> theme::Text {
++        panel_color(&self.config)
++            .map(theme::Text::Color)
++            .unwrap_or_default()
++    }
++
++    fn save_config(&self) {
++        match Config::new(
++            <Self as cosmic::Application>::APP_ID,
++            TimeAppletConfig::VERSION,
++        ) {
++            Ok(helper) => {
++                if let Err(err) = self.config.write_entry(&helper) {
++                    tracing::error!(?err, "Could not save clock preferences");
++                }
++            }
++            Err(err) => tracing::error!(?err, "Could not open clock preferences"),
++        }
++    }
++
++    fn preferences_view(&self) -> Element<'_, Message> {
++        let mut controls = column![
++            text::body(fl!("clock-preferences")).font(cosmic::font::bold()),
++            toggler(self.config.bold_text)
++                .label(fl!("clock-bold"))
++                .text_size(14)
++                .width(Length::Fill)
++                .on_toggle(Message::SetBold),
++            toggler(self.config.show_seconds)
++                .label(fl!("clock-seconds"))
++                .text_size(14)
++                .width(Length::Fill)
++                .on_toggle(Message::SetShowSeconds),
++            toggler(self.config.military_time)
++                .label(fl!("clock-24-hour"))
++                .text_size(14)
++                .width(Length::Fill)
++                .on_toggle(Message::SetMilitaryTime),
++            toggler(self.config.date_time_separator.is_some())
++                .label(fl!("clock-custom-separator"))
++                .text_size(14)
++                .width(Length::Fill)
++                .on_toggle(Message::SetCustomSeparator),
++        ]
++        .spacing(16);
++
++        if let Some(separator) = &self.config.date_time_separator {
++            controls = controls.push(
++                column![
++                    text::body(fl!("clock-separator")),
++                    text_input(" | ", separator).on_input(Message::SetSeparator),
++                ]
++                .spacing(8),
++            );
+         }
++        controls = controls.push(
++            toggler(self.config.text_color.is_some())
++                .label(fl!("clock-custom-color"))
++                .text_size(14)
++                .width(Length::Fill)
++                .on_toggle(Message::SetCustomColor),
++        );
++        if self.config.text_color.is_some() {
++            let mut color_controls = column![
++                text::body(fl!("clock-color-hex")),
++                text_input(DEFAULT_TEXT_COLOR, &self.color_input).on_input(Message::SetColor),
++            ]
++            .spacing(8);
++            if parse_hex_color(&self.color_input).is_none() {
++                color_controls = color_controls.push(text::caption(fl!("clock-color-invalid")));
++            }
++            controls = controls.push(color_controls);
++        }
++        if !self.config.format_strftime.is_empty() {
++            controls = controls
++                .push(button::text(fl!("clock-reset-format")).on_press(Message::ResetCustomFormat));
++        }
++
++        let content = column![
++            padded_control(controls),
++            padded_control(divider::horizontal::default()).padding([8, 12]),
++            menu_button(text::body(fl!("clock-back"))).on_press(Message::TogglePreferences),
++        ]
++        .padding([16, 0]);
++        self.core.applet.popup_container(container(content)).into()
+     }
+ 
+     fn calendar_grid(&self) -> Grid<'_, Message> {
+@@ -193,7 +292,14 @@ impl Window {
+         let elements: Vec<Element<'_, Message>> = if let Some(strftime) = self.maybe_strftime() {
+             strftime
+                 .split_whitespace()
+-                .map(|piece| self.core.applet.text(piece.to_owned()).into())
++                .map(|piece| {
++                    self.core
++                        .applet
++                        .text(piece.to_owned())
++                        .font(self.panel_font())
++                        .class(self.panel_text_style())
++                        .into()
++                })
+                 .collect()
+         } else {
+             let mut elements = Vec::new();
+@@ -213,7 +319,14 @@ impl Window {
+                     .to_string();
+ 
+                 for p in formatted_date.split_whitespace() {
+-                    elements.push(self.core.applet.text(p.to_owned()).into());
++                    elements.push(
++                        self.core
++                            .applet
++                            .text(p.to_owned())
++                            .font(self.panel_font())
++                            .class(self.panel_text_style())
++                            .into(),
++                    );
+                 }
+                 elements.push(
+                     rule::horizontal(2)
+@@ -233,7 +346,14 @@ impl Window {
+             // todo: split using formatToParts when it is implemented
+             // https://github.com/unicode-org/icu4x/issues/4936#issuecomment-2128812667
+             for p in formatted_time.split_whitespace().flat_map(|s| s.split(':')) {
+-                elements.push(self.core.applet.text(p.to_owned()).into());
++                elements.push(
++                    self.core
++                        .applet
++                        .text(p.to_owned())
++                        .font(self.panel_font())
++                        .class(self.panel_text_style())
++                        .into(),
++                );
+             }
+ 
+             elements
+@@ -257,52 +377,15 @@ impl Window {
+     }
+ 
+     fn horizontal_layout(&self) -> Element<'_, Message> {
+-        let formatted_date = if let Some(strftime) = self.maybe_strftime() {
+-            strftime
+-        } else {
+-            let datetime = self.create_datetime(&self.now.date());
+-            let mut prefs = DateTimeFormatterPreferences::from(self.locale.clone());
+-            prefs.hour_cycle = Some(if self.config.military_time {
+-                HourCycle::H23
+-            } else {
+-                HourCycle::H12
+-            });
+-
+-            if self.config.show_date_in_top_panel {
+-                if self.config.show_weekday {
+-                    let mut fs = fieldsets::MDET::medium();
+-                    if !self.config.show_seconds {
+-                        fs = fs.with_time_precision(TimePrecision::Minute);
+-                    }
+-                    DateTimeFormatter::try_new(prefs, fs)
+-                        .unwrap()
+-                        .format(&datetime)
+-                        .to_string()
+-                } else {
+-                    let mut fs = fieldsets::MDT::medium();
+-                    if !self.config.show_seconds {
+-                        fs = fs.with_time_precision(TimePrecision::Minute);
+-                    }
+-                    DateTimeFormatter::try_new(prefs, fs)
+-                        .unwrap()
+-                        .format(&datetime)
+-                        .to_string()
+-                }
+-            } else {
+-                let mut fs = fieldsets::T::medium();
+-                if !self.config.show_seconds {
+-                    fs = fs.with_time_precision(TimePrecision::Minute);
+-                }
+-                DateTimeFormatter::try_new(prefs, fs)
+-                    .unwrap()
+-                    .format(&datetime)
+-                    .to_string()
+-            }
+-        };
++        let formatted_date = format_panel_datetime(&self.config, &self.now, self.locale.clone());
+ 
+         Element::from(
+             row!(
+-                self.core.applet.text(formatted_date),
++                self.core
++                    .applet
++                    .text(formatted_date)
++                    .font(self.panel_font())
++                    .class(self.panel_text_style()),
+                 container(space::vertical().height(Length::Fixed(
+                     (self.core.applet.suggested_size(true).1
+                         + 2 * self.core.applet.suggested_padding(true).1)
+@@ -318,7 +401,11 @@ impl cosmic::Application for Window {
+     type Message = Message;
+     type Executor = cosmic::SingleThreadExecutor;
+     type Flags = ();
+-    const APP_ID: &str = "com.system76.CosmicAppletTime";
++    const APP_ID: &str = if cfg!(feature = "personal-clock") {
++        "io.github.motixo.CosmicClock"
++    } else {
++        "com.system76.CosmicAppletTime"
++    };
+ 
+     fn init(core: app::Core, _flags: Self::Flags) -> (Self, app::Task<Self::Message>) {
+         let locale = get_system_locale();
+@@ -327,7 +414,14 @@ impl cosmic::Application for Window {
+         let today = now.date();
+ 
+         // Synch `show_seconds` from the config within the time subscription
+-        let (show_seconds_tx, _) = watch::channel(true);
++        let config = Config::new(Self::APP_ID, TimeAppletConfig::VERSION)
++            .map(|helper| TimeAppletConfig::get_entry(&helper).unwrap_or_else(|(_, config)| config))
++            .unwrap_or_default();
++        let (show_seconds_tx, _) = watch::channel(config.show_seconds);
++        let color_input = config
++            .text_color
++            .clone()
++            .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
+ 
+         (
+             Self {
+@@ -340,7 +434,9 @@ impl cosmic::Application for Window {
+                 rectangle_tracker: None,
+                 rectangle: Rectangle::default(),
+                 token_tx: None,
+-                config: TimeAppletConfig::default(),
++                config,
++                show_preferences: false,
++                color_input,
+                 show_seconds_tx,
+                 locale,
+             },
+@@ -520,6 +616,7 @@ impl cosmic::Application for Window {
+                 if let Some(p) = self.popup.take() {
+                     destroy_popup(p)
+                 } else {
++                    self.show_preferences = false;
+                     return cosmic::surface::surface_task(cosmic::surface::action::app_popup(
+                         |_| Default::default(),
+                         |app: &mut Self| {
+@@ -636,7 +733,73 @@ impl cosmic::Application for Window {
+                 }
+                 Task::none()
+             }
++            Message::TogglePreferences => {
++                self.show_preferences = !self.show_preferences;
++                if self.show_preferences {
++                    self.color_input = self
++                        .config
++                        .text_color
++                        .clone()
++                        .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
++                }
++                Task::none()
++            }
++            Message::SetBold(enabled) => {
++                self.config.bold_text = enabled;
++                self.save_config();
++                Task::none()
++            }
++            Message::SetShowSeconds(enabled) => {
++                self.config.show_seconds = enabled;
++                self.show_seconds_tx.send_replace(enabled);
++                self.save_config();
++                Task::none()
++            }
++            Message::SetMilitaryTime(enabled) => {
++                self.config.military_time = enabled;
++                self.save_config();
++                Task::none()
++            }
++            Message::SetCustomSeparator(enabled) => {
++                self.config.date_time_separator = enabled.then(|| " | ".to_string());
++                self.save_config();
++                Task::none()
++            }
++            Message::SetSeparator(separator) => {
++                self.config.date_time_separator = Some(separator);
++                self.save_config();
++                Task::none()
++            }
++            Message::SetCustomColor(enabled) => {
++                if enabled && parse_hex_color(&self.color_input).is_none() {
++                    self.color_input = DEFAULT_TEXT_COLOR.into();
++                }
++                self.config.text_color = enabled.then(|| self.color_input.clone());
++                self.save_config();
++                Task::none()
++            }
++            Message::SetColor(value) => {
++                self.color_input = value;
++                // Keep the last valid color while an incomplete or invalid code is edited.
++                if parse_hex_color(&self.color_input).is_some() {
++                    self.config.text_color = Some(self.color_input.clone());
++                    self.save_config();
++                }
++                Task::none()
++            }
++            Message::ResetCustomFormat => {
++                self.config.format_strftime.clear();
++                self.show_seconds_tx.send_replace(self.config.show_seconds);
++                self.save_config();
++                Task::none()
++            }
+             Message::ConfigChanged(c) => {
++                if self.config.text_color != c.text_color {
++                    self.color_input = c
++                        .text_color
++                        .clone()
++                        .unwrap_or_else(|| DEFAULT_TEXT_COLOR.into());
++                }
+                 // Don't interrupt the tick subscription unless necessary
+                 self.show_seconds_tx.send_if_modified(|show_seconds| {
+                     if !c.format_strftime.is_empty() {
+@@ -709,6 +872,10 @@ impl cosmic::Application for Window {
+     }
+ 
+     fn view_window(&self, _id: window::Id) -> Element<'_, Message> {
++        if self.show_preferences {
++            return self.preferences_view();
++        }
++
+         let Spacing {
+             space_xxs, space_s, ..
+         } = theme::active().cosmic().spacing;
+@@ -752,6 +919,7 @@ impl cosmic::Application for Window {
+             .padding([12, 20]),
+             calendar.padding([0, 12].into()),
+             padded_control(divider::horizontal::default()).padding([space_xxs, space_s]),
++            menu_button(text::body(fl!("clock-preferences"))).on_press(Message::TogglePreferences),
+             menu_button(text::body(fl!("datetime-settings")))
+                 .on_press(Message::OpenDateTimeSettings),
+         ]
+diff --git a/cosmic-applets-config/src/time.rs b/cosmic-applets-config/src/time.rs
+index 8af3902..f36d3ea 100644
+--- a/cosmic-applets-config/src/time.rs
++++ b/cosmic-applets-config/src/time.rs
+@@ -11,6 +11,12 @@ pub struct TimeAppletConfig {
+     pub first_day_of_week: u8,
+     pub show_date_in_top_panel: bool,
+     pub show_weekday: bool,
++    #[serde(default)]
++    pub bold_text: bool,
++    #[serde(default)]
++    pub date_time_separator: Option<String>,
++    #[serde(default)]
++    pub text_color: Option<String>,
+     #[serde(default, skip_serializing_if = "str::is_empty")]
+     pub format_strftime: String,
+ }
+@@ -23,6 +29,9 @@ impl Default for TimeAppletConfig {
+             first_day_of_week: 6,
+             show_date_in_top_panel: true,
+             show_weekday: false,
++            bold_text: false,
++            date_time_separator: None,
++            text_color: None,
+             format_strftime: Default::default(),
+         }
+     }
+diff --git a/cosmic-applet-time/src/presentation.rs b/cosmic-applet-time/src/presentation.rs
+new file mode 100644
+index 0000000..eab1361
+--- /dev/null
++++ b/cosmic-applet-time/src/presentation.rs
+@@ -0,0 +1,276 @@
++// SPDX-License-Identifier: GPL-3.0-only
++
++use crate::config::TimeAppletConfig;
++use icu::{
++    datetime::{
++        DateTimeFormatter, DateTimeFormatterPreferences, fieldsets,
++        input::{Date as IcuDate, DateTime, Time},
++        options::TimePrecision,
++    },
++    locale::{Locale, preferences::extensions::unicode::keywords::HourCycle},
++};
++use jiff::{Zoned, civil::Date, fmt::strtime};
++
++pub const DEFAULT_TEXT_COLOR: &str = "#FF9500";
++
++pub fn parse_hex_color(value: &str) -> Option<cosmic::iced::Color> {
++    let value = value.trim();
++    let hex = value.strip_prefix('#').unwrap_or(value);
++    // Validate before calling Iced's byte-indexed parser so Unicode input is safe.
++    if !matches!(hex.len(), 3 | 6) || !hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
++        return None;
++    }
++    hex.parse().ok()
++}
++
++pub fn panel_color(config: &TimeAppletConfig) -> Option<cosmic::iced::Color> {
++    config.text_color.as_deref().and_then(parse_hex_color)
++}
++
++pub fn create_datetime(date: &Date, now: &Zoned) -> DateTime<icu::calendar::Gregorian> {
++    DateTime {
++        date: IcuDate::try_new_gregorian(date.year() as i32, date.month() as u8, date.day() as u8)
++            .expect("valid date"),
++        time: Time::try_new(now.hour() as u8, now.minute() as u8, now.second() as u8, 0)
++            .expect("valid time"),
++    }
++}
++
++pub fn format_panel_datetime(config: &TimeAppletConfig, now: &Zoned, locale: Locale) -> String {
++    if !config.format_strftime.is_empty()
++        && let Ok(formatted) = strtime::format(&config.format_strftime, now)
++    {
++        return formatted;
++    }
++
++    let datetime = create_datetime(&now.date(), now);
++    let mut prefs = DateTimeFormatterPreferences::from(locale);
++    prefs.hour_cycle = Some(if config.military_time {
++        HourCycle::H23
++    } else {
++        HourCycle::H12
++    });
++
++    let time_fields = if config.show_seconds {
++        fieldsets::T::medium().with_time_precision(TimePrecision::Second)
++    } else {
++        fieldsets::T::medium().with_time_precision(TimePrecision::Minute)
++    };
++
++    if !config.show_date_in_top_panel {
++        return DateTimeFormatter::try_new(prefs, time_fields)
++            .unwrap()
++            .format(&datetime)
++            .to_string();
++    }
++
++    if let Some(separator) = &config.date_time_separator {
++        let date = if config.show_weekday {
++            DateTimeFormatter::try_new(prefs, fieldsets::MDE::medium())
++                .unwrap()
++                .format(&datetime)
++                .to_string()
++        } else {
++            DateTimeFormatter::try_new(prefs, fieldsets::MD::medium())
++                .unwrap()
++                .format(&datetime)
++                .to_string()
++        };
++        let time = DateTimeFormatter::try_new(prefs, time_fields)
++            .unwrap()
++            .format(&datetime)
++            .to_string();
++        return format!("{date}{separator}{time}");
++    }
++
++    // Preserve ICU's locale-specific date/time order and punctuation by default.
++    let precision = if config.show_seconds {
++        TimePrecision::Second
++    } else {
++        TimePrecision::Minute
++    };
++    if config.show_weekday {
++        DateTimeFormatter::try_new(
++            prefs,
++            fieldsets::MDET::medium().with_time_precision(precision),
++        )
++        .unwrap()
++        .format(&datetime)
++        .to_string()
++    } else {
++        DateTimeFormatter::try_new(
++            prefs,
++            fieldsets::MDT::medium().with_time_precision(precision),
++        )
++        .unwrap()
++        .format(&datetime)
++        .to_string()
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++
++    #[test]
++    fn hex_colors_support_short_long_and_optional_hash() {
++        for input in ["#FF9500", "ff9500", "  #fF9500  "] {
++            assert_eq!(
++                parse_hex_color(input).unwrap().into_rgba8(),
++                [255, 149, 0, 255]
++            );
++        }
++        assert_eq!(
++            parse_hex_color("#0af").unwrap().into_rgba8(),
++            [0, 170, 255, 255]
++        );
++        assert_eq!(parse_hex_color("000000"), Some(cosmic::iced::Color::BLACK));
++        assert_eq!(parse_hex_color("#fff"), Some(cosmic::iced::Color::WHITE));
++    }
++
++    #[test]
++    fn invalid_and_unicode_colors_are_rejected_without_panicking() {
++        for input in [
++            "",
++            "#",
++            "#12",
++            "#12345",
++            "#1234567",
++            "#GG0000",
++            "red",
++            "##123456",
++            "#12 456",
++            "ییی",
++            "é1234",
++            "#ＦＦＦ",
++            "#1234",
++            "#12345678",
++        ] {
++            assert_eq!(parse_hex_color(input), None, "{input}");
++        }
++    }
++
++    #[test]
++    fn missing_or_invalid_color_uses_the_theme() {
++        let mut config = TimeAppletConfig::default();
++        assert_eq!(panel_color(&config), None);
++        config.text_color = Some("#00FF00".into());
++        assert_eq!(panel_color(&config).unwrap().into_rgba8(), [0, 255, 0, 255]);
++        config.text_color = Some("invalid".into());
++        assert_eq!(panel_color(&config), None);
++        config.text_color = None;
++        assert_eq!(panel_color(&config), None);
++    }
++
++    fn example() -> (TimeAppletConfig, Zoned, Locale) {
++        (
++            TimeAppletConfig {
++                military_time: true,
++                date_time_separator: Some(" | ".into()),
++                ..Default::default()
++            },
++            "2026-10-23T14:05:09+03:30[Asia/Tehran]".parse().unwrap(),
++            "en-US".parse().unwrap(),
++        )
++    }
++
++    #[test]
++    fn custom_separator_and_seconds() {
++        let (mut config, now, locale) = example();
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale.clone()),
++            "Oct 23 | 14:05"
++        );
++        config.show_seconds = true;
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale),
++            "Oct 23 | 14:05:09"
++        );
++    }
++
++    #[test]
++    fn unicode_and_empty_separators_are_literal() {
++        let (mut config, now, locale) = example();
++        config.date_time_separator = Some(" 🌙 · ".into());
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale.clone()),
++            "Oct 23 🌙 · 14:05"
++        );
++        config.date_time_separator = Some(String::new());
++        assert_eq!(format_panel_datetime(&config, &now, locale), "Oct 2314:05");
++    }
++
++    #[test]
++    fn hidden_date_has_no_separator() {
++        let (mut config, now, locale) = example();
++        config.show_date_in_top_panel = false;
++        config.show_seconds = true;
++        assert_eq!(format_panel_datetime(&config, &now, locale), "14:05:09");
++    }
++
++    #[test]
++    fn weekday_and_twelve_hour_time_are_preserved() {
++        let (mut config, now, locale) = example();
++        config.show_weekday = true;
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale.clone()),
++            "Fri, Oct 23 | 14:05"
++        );
++        config.military_time = false;
++        let formatted = format_panel_datetime(&config, &now, locale);
++        assert!(formatted.starts_with("Fri, Oct 23 | 2:05"), "{formatted}");
++        assert!(formatted.ends_with("PM"), "{formatted}");
++    }
++
++    #[test]
++    fn system_separator_can_be_restored() {
++        let (mut config, now, locale) = example();
++        config.date_time_separator = None;
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale),
++            "Oct 23, 14:05"
++        );
++    }
++
++    #[test]
++    fn twelve_and_twenty_four_hour_boundaries() {
++        let (mut config, _, locale) = example();
++        config.show_date_in_top_panel = false;
++        for (hour, expected_24, expected_12) in [
++            ("00", "00:05", "12:05 AM"),
++            ("12", "12:05", "12:05 PM"),
++            ("13", "13:05", "1:05 PM"),
++            ("23", "23:05", "11:05 PM"),
++        ] {
++            let now: Zoned = format!("2026-10-23T{hour}:05:09+03:30[Asia/Tehran]")
++                .parse()
++                .unwrap();
++            config.military_time = true;
++            assert_eq!(
++                format_panel_datetime(&config, &now, locale.clone()),
++                expected_24
++            );
++            config.military_time = false;
++            let formatted = format_panel_datetime(&config, &now, locale.clone());
++            assert_eq!(
++                formatted.split_whitespace().collect::<Vec<_>>().join(" "),
++                expected_12
++            );
++        }
++    }
++
++    #[test]
++    fn legacy_format_keeps_precedence_and_invalid_format_falls_back() {
++        let (mut config, now, locale) = example();
++        config.format_strftime = "%Y-%m-%d => %H:%M".into();
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale.clone()),
++            "2026-10-23 => 14:05"
++        );
++        config.format_strftime = "%".into();
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale),
++            "Oct 23 | 14:05"
++        );
++    }
++}

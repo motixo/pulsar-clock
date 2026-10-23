@@ -1,0 +1,16 @@
+COSMIC Clock
+
+The clock patch is based on pop-os/cosmic-applets by System76 and its contributors.
+Upstream: https://github.com/pop-os/cosmic-applets
+Tested base tag: epoch-1.9.0
+Tested base commit: 82e7cd814addb0641959b634227fe550374e195b
+
+Modifications add panel text weight, date/time separators, HEX text colors,
+and in-applet controls for seconds and 12/24-hour time.
+
+The patch and accompanying scripts are licensed under GPL-3.0-only.
+Existing upstream copyright and license notices are retained in the patch.
+See LICENSE for the license text.
+
+assets/screenshot.png is a usage screenshot supplied by the repository owner.
+Third-party artwork visible in the screenshot is not relicensed by this project.

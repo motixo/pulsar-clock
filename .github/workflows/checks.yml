@@ -1,0 +1,30 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scripts-and-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+      - name: Check scripts and installer lifecycle
+        run: |
+          bash -n install.sh uninstall.sh
+          ./install.sh --help
+          ./uninstall.sh --help
+          python3 -m unittest discover -s tests -v
+      - name: Check patch against the supported upstream release
+        run: |
+          git clone --depth 1 --single-branch --branch epoch-1.9.0 https://github.com/pop-os/cosmic-applets.git "$RUNNER_TEMP/cosmic-applets"
+          git -C "$RUNNER_TEMP/cosmic-applets" apply --check "$GITHUB_WORKSPACE/clock-preferences.patch"

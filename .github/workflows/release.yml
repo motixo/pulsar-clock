@@ -1,0 +1,23 @@
+name: Build binary release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build binary, run clock tests, and package source
+        run: ./scripts/build-release.sh "$RUNNER_TEMP/release"
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 -c 'import json; print(json.load(open("release.json"))["version"])')
+          gh release create "v$version" "$RUNNER_TEMP/release/"* --target "$GITHUB_SHA" --title "COSMIC Clock v$version" --notes-file RELEASE_NOTES.md

@@ -28,7 +28,7 @@ DEFAULTS = {
     "show_weekday": "false",
     "format_strftime": '""',
     "bold_text": "true",
-    "date_time_separator": "None",
+    "date_time_separator": 'Some(" • ")',
     "text_color": "None",
 }
 

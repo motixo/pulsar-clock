@@ -64,8 +64,34 @@ index 668189e..ed794d8 100644
  mod time;
  mod window;
  
+diff --git a/cosmic-applet-time/src/main.rs b/cosmic-applet-time/src/main.rs
+index 7fbb932..063ec7f 100644
+--- a/cosmic-applet-time/src/main.rs
++++ b/cosmic-applet-time/src/main.rs
+@@ -4,6 +4,21 @@
+ const VERSION: &str = env!("CARGO_PKG_VERSION");
+ 
+ fn main() -> cosmic::iced::Result {
++    #[cfg(feature = "personal-clock")]
++    {
++        let version = option_env!("COSMIC_CLOCK_VERSION").unwrap_or("development");
++        if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
++            println!("COSMIC Clock {version} (COSMIC {VERSION})");
++            return Ok(());
++        }
++        if std::env::args().any(|arg| arg == "--help" || arg == "-h") {
++            println!(
++                "COSMIC Clock {version}\n\nA COSMIC panel applet. Use install.sh, then add Custom Clock to your panel.\n\nOptions:\n  -V, --version  Print version\n  -h, --help     Print help"
++            );
++            return Ok(());
++        }
++    }
++
+     tracing_subscriber::fmt::init();
+     let _ = tracing_log::LogTracer::init();
+ 
 diff --git a/cosmic-applet-time/src/window.rs b/cosmic-applet-time/src/window.rs
-index a96b447..3d10f06 100644
+index a96b447..29eb02c 100644
 --- a/cosmic-applet-time/src/window.rs
 +++ b/cosmic-applet-time/src/window.rs
 @@ -18,7 +18,7 @@ use cosmic::{
@@ -205,7 +231,7 @@ index a96b447..3d10f06 100644
 +            controls = controls.push(
 +                column![
 +                    text::body(fl!("clock-separator")),
-+                    text_input(" | ", separator).on_input(Message::SetSeparator),
++                    text_input(" • ", separator).on_input(Message::SetSeparator),
 +                ]
 +                .spacing(8),
 +            );
@@ -430,7 +456,7 @@ index a96b447..3d10f06 100644
 +                Task::none()
 +            }
 +            Message::SetCustomSeparator(enabled) => {
-+                self.config.date_time_separator = enabled.then(|| " | ".to_string());
++                self.config.date_time_separator = enabled.then(|| " • ".to_string());
 +                self.save_config();
 +                Task::none()
 +            }
@@ -492,7 +518,7 @@ index a96b447..3d10f06 100644
                  .on_press(Message::OpenDateTimeSettings),
          ]
 diff --git a/cosmic-applets-config/src/time.rs b/cosmic-applets-config/src/time.rs
-index 8af3902..f36d3ea 100644
+index 8af3902..b05ef17 100644
 --- a/cosmic-applets-config/src/time.rs
 +++ b/cosmic-applets-config/src/time.rs
 @@ -11,6 +11,12 @@ pub struct TimeAppletConfig {
@@ -513,17 +539,17 @@ index 8af3902..f36d3ea 100644
              show_date_in_top_panel: true,
              show_weekday: false,
 +            bold_text: false,
-+            date_time_separator: None,
++            date_time_separator: Some(" • ".into()),
 +            text_color: None,
              format_strftime: Default::default(),
          }
      }
 diff --git a/cosmic-applet-time/src/presentation.rs b/cosmic-applet-time/src/presentation.rs
 new file mode 100644
-index 0000000..eab1361
+index 0000000..d893a22
 --- /dev/null
 +++ b/cosmic-applet-time/src/presentation.rs
-@@ -0,0 +1,276 @@
+@@ -0,0 +1,289 @@
 +// SPDX-License-Identifier: GPL-3.0-only
 +
 +use crate::config::TimeAppletConfig;
@@ -755,6 +781,19 @@ index 0000000..eab1361
 +        assert_eq!(
 +            format_panel_datetime(&config, &now, locale),
 +            "Oct 23, 14:05"
++        );
++    }
++
++    #[test]
++    fn default_separator_is_a_spaced_bullet() {
++        let (_, now, locale) = example();
++        let config = TimeAppletConfig {
++            military_time: true,
++            ..Default::default()
++        };
++        assert_eq!(
++            format_panel_datetime(&config, &now, locale),
++            "Oct 23 • 14:05"
 +        );
 +    }
 +

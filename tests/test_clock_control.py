@@ -48,6 +48,7 @@ class ClockControlTests(unittest.TestCase):
         self.assertIn(f'"{clock.APP_ID}"', self.center.read_text())
         self.assertEqual((clock.CONFIG / clock.APP_ID / "v1/show_seconds").read_text(), "true")
         self.assertEqual((clock.CONFIG / clock.APP_ID / "v1/bold_text").read_text(), "true")
+        self.assertEqual((clock.CONFIG / clock.APP_ID / "v1/date_time_separator").read_text(), 'Some(" • ")')
         self.assertEqual((clock.CONFIG / clock.APP_ID / "v1/text_color").read_text(), "None")
         self.assertEqual((clock.CONFIG / clock.STOCK_ID / "v1/show_seconds").read_text(), "true")
         self.assertTrue(clock.BINARY.is_file())

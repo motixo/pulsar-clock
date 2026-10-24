@@ -27,7 +27,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     bundle = {**release, "binary_sha256": hashlib.sha256(args.binary.read_bytes()).hexdigest()}
     files = [
-        "install.sh", "uninstall.sh", "build-from-source.sh", "release.json",
+        "install.sh", "install-online.sh", "uninstall.sh", "build-from-source.sh", "release.json",
         "README.md", "LICENSE", "NOTICE", "clock-preferences.patch", "assets/screenshot.png",
         "scripts/clock-control.py", "scripts/install-prebuilt.py",
     ]

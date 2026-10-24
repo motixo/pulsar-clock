@@ -23,14 +23,19 @@ Turning off **Custom text colors** restores the theme color and keeps both saved
 
 The prebuilt release supports **Linux x86_64**, **glibc 2.35 or newer**, and **COSMIC 1.9.0, 1.10.0 and 1.11.0**. Python 3.9+ and the runtime libraries used by COSMIC are needed. Rust, Cargo, and a C compiler are optional.
 
-Download the archive from [Releases](https://github.com/motixo/pulsar-clock/releases/latest), or run:
+Install with one command:
 
 ```sh
-curl -fLO https://github.com/motixo/pulsar-clock/releases/latest/download/pulsar-clock-linux-x86_64.tar.gz
-tar -xzf pulsar-clock-linux-x86_64.tar.gz
-cd pulsar-clock
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/motixo/pulsar-clock/main/install-online.sh | sh
 ```
+
+This fetches the current installer, downloads the compatible Linux x86_64 release, and verifies its SHA-256 checksum. The same prebuilt clock supports all three COSMIC versions above. To preserve the panel's current applet selection:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/motixo/pulsar-clock/main/install-online.sh | sh -s -- --no-activate
+```
+
+The online installer needs `curl`, `tar`, and Python 3. To inspect the scripts first, clone the repository and run `./install.sh`. You can also download and extract the binary archive from [Releases](https://github.com/motixo/pulsar-clock/releases/latest), then run its `./install.sh`.
 
 The archive contains the compiled clock, installer, and uninstaller. Installation verifies the binary checksum and checks that the executable can run before changing the installed clock. Run it as your normal desktop user, without `sudo`.
 
@@ -92,15 +97,19 @@ git pull --ff-only
 ./install.sh
 ```
 
-Or download and install the latest binary archive again. Existing preferences are preserved. The installer leaves the active clock running; the new executable takes effect on the next login or panel reload.
+Or run the online installation command again. Existing preferences are preserved. The installer leaves the active clock running; the new executable takes effect on the next login or panel reload.
 
 A future incompatible COSMIC panel API may require an updated release or an adapted source patch. Failed downloads, checksums, runtime checks, patch checks, and builds leave the installed executable in place.
 
 ## Uninstall
 
+No checkout is needed for online removal:
+
 ```sh
-./uninstall.sh
+curl -fsSL https://raw.githubusercontent.com/motixo/pulsar-clock/main/install-online.sh | sh -s -- --uninstall
 ```
+
+From a checkout or extracted archive, use `./uninstall.sh`. The online command also accepts `--uninstall --purge` to remove custom preferences and caches.
 
 This restores the stock clock in the panel and removes the custom executable and desktop entry. Custom preferences and caches are kept for a later reinstall. To remove those too:
 
@@ -128,7 +137,7 @@ Configuration, data, cache, and state paths respect their corresponding XDG envi
 
 ```sh
 python3 -m unittest discover -s tests -v
-bash -n install.sh build-from-source.sh uninstall.sh scripts/build-release.sh
+bash -n install.sh install-online.sh build-from-source.sh uninstall.sh scripts/build-release.sh
 ```
 
 Installer tests run in temporary directories and cover install/uninstall behavior, preserving settings and processes, checksum validation, runtime compatibility, and safe reading of binary archives. The source patch includes clock formatting and color tests.
